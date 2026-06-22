@@ -1,0 +1,25 @@
+# Virtual environment
+verigraph/
+venv/
+.venv/
+env/
+ENV/
+
+# Secrets
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# IDE files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
