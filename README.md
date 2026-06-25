@@ -55,3 +55,20 @@ documents = pipeline.load_directory("data/raw")
 # You now have a list of Document objects!
 # Each Document has `.page_content` (the text) and `.metadata` (dict with source, page)
 ```
+
+## Enterprise Embedding Pipeline
+
+Once documents are ingested and chunked, you can use the `EmbeddingService` to instantly convert the chunks into 384-dimensional mathematical vectors using the lightning-fast `BAAI/bge-small-en-v1.5` model. These vectors are automatically injected directly into the `Document` metadata, keeping your text and citations perfectly synced.
+
+```python
+from embeddings.embedding_service import EmbeddingService
+
+# Initialize the embedding service
+embedding_service = EmbeddingService()
+
+# Batch process all document chunks 
+embedded_docs = embedding_service.process_documents(documents)
+
+# The vector is now securely attached to the metadata!
+# embedded_docs[0].metadata["embedding"] -> [-0.028, 0.004, ...]
+```
