@@ -1,6 +1,9 @@
 import copy
-from typing import List
+import json
+from pathlib import Path
+from typing import List, Optional
 from ingestion.models import Document
+
 
 class TextChunker:
     """
@@ -10,13 +13,15 @@ class TextChunker:
     def __init__(
         self,
         chunk_size: int = 500,
-        chunk_overlap: int = 50
+        chunk_overlap: int = 50,
+        output_dir: Optional[str] = None,
     ):
         if chunk_overlap >= chunk_size:
             raise ValueError("chunk_overlap must be strictly less than chunk_size")
-            
+
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
+        self.output_dir = Path(output_dir) if output_dir else Path(__file__).resolve().parents[1] / "data" / "processed data"
 
     def split_document(self, doc: Document) -> List[Document]:
         """
@@ -30,6 +35,28 @@ class TextChunker:
             new_metadata["chunk_index"] = i
             doc_chunks.append(Document(page_content=text_chunk, metadata=new_metadata))
         return doc_chunks
+
+    def save_chunks_to_json(self, documents: List[Document], output_dir: Optional[str] = None, filename: str = "chunks.json") -> str:
+        """
+        Persist chunk text and metadata to disk as JSON under the processed data folder.
+        """
+        target_dir = Path(output_dir) if output_dir else self.output_dir
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        payload = []
+        for doc in documents:
+            metadata = copy.deepcopy(doc.metadata)
+            metadata.pop("embedding", None)
+            payload.append({
+                "page_content": doc.page_content,
+                "metadata": metadata,
+            })
+
+        output_path = target_dir / filename
+        with output_path.open("w", encoding="utf-8") as handle:
+            json.dump(payload, handle, ensure_ascii=False, indent=2)
+
+        return str(output_path)
 
     def split_text(self, text: str) -> List[str]:
         if not text:
