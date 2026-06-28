@@ -72,3 +72,49 @@ embedded_docs = embedding_service.process_documents(documents)
 # The vector is now securely attached to the metadata!
 # embedded_docs[0].metadata["embedding"] -> [-0.028, 0.004, ...]
 ```
+
+## ChromaDB Vector Store
+
+This project stores embeddings and document chunks in a persistent ChromaDB collection via `vectorstore.chroma_db.ChromaDBManager`.
+
+```python
+from vectorstore.chroma_db import ChromaDBManager
+
+store = ChromaDBManager(persist_directory="data/embeddings")
+store.add_chunk_documents(
+    chunks=embedded_docs,
+    embeddings=[doc.metadata["embedding"] for doc in embedded_docs],
+)
+```
+
+## Semantic Search Wrapper
+
+The `SimilaritySearch` wrapper provides a reusable, metadata-aware search interface on top of ChromaDB.
+
+```python
+from vectorstore.similarity_search import SimilaritySearch
+
+search = SimilaritySearch(collection_name="verigraph_collection")
+results = search.search("What is the confidentiality policy?", top_k=3)
+print(results["results"][0])
+```
+
+You can also use `search_one(...)` for a single query result list.
+
+## End-to-End Pipeline Test
+
+Run the full pipeline with `test_pipeline.py` to validate ingestion, embedding, storage, and retrieval.
+
+```bash
+python test_pipeline.py --mock-embed
+```
+
+This executes:
+
+- PDF/DOCX loading from `data/raw`
+- chunk creation and metadata preservation
+- embedding generation or lightweight mock embeddings
+- ChromaDB insertion
+- semantic search verification with sample queries
+
+To keep a persistent Chroma directory, provide `--persist-dir`.
