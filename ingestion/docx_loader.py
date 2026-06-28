@@ -36,7 +36,7 @@ class DOCXLoader:
 
         docs = []
         try:
-            document = DocxDocument(doc_path)
+            document = DocxDocument(self.file_path)
             paragraphs = []
             for para in document.paragraphs:
                 text = para.text.strip()

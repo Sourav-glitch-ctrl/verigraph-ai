@@ -89,7 +89,7 @@ store.add_chunk_documents(
 
 ## Semantic Search Wrapper
 
-The `SimilaritySearch` wrapper provides a reusable, metadata-aware search interface on top of ChromaDB.
+The [SimilaritySearch](file:///c:/Users/soura/Documents/Projects/VeriGraph_AI/vectorstore/similarity_search.py#L20) wrapper provides a reusable, metadata-aware search interface on top of ChromaDB.
 
 ```python
 from vectorstore.similarity_search import SimilaritySearch
@@ -101,9 +101,37 @@ print(results["results"][0])
 
 You can also use `search_one(...)` for a single query result list.
 
+## Production Retrieval Architecture
+
+VeriGraph AI features a modular, production-ready retrieval architecture defined in [retrieval.py](file:///c:/Users/soura/Documents/Projects/VeriGraph_AI/vectorstore/retrieval.py) that separates raw database querying from retrieval logic and post-processing:
+
+- **[RetrievedChunk](file:///c:/Users/soura/Documents/Projects/VeriGraph_AI/vectorstore/retrieval.py#L10)**: A structured dataclass representing retrieval hits (`id`, `text`, `score`, and `metadata`).
+- **[SearchBackend](file:///c:/Users/soura/Documents/Projects/VeriGraph_AI/vectorstore/retrieval.py#L30)**: An abstract interface for querying databases (e.g., [ChromaSearchBackend](file:///c:/Users/soura/Documents/Projects/VeriGraph_AI/vectorstore/similarity_search.py#L125) adapts ChromaDB to this interface).
+- **[BasePostProcessor](file:///c:/Users/soura/Documents/Projects/VeriGraph_AI/vectorstore/retrieval.py#L63)**: Interface for downstream steps such as re-ranking, duplicate removal, or metadata adjustments.
+- **[StandardRetriever](file:///c:/Users/soura/Documents/Projects/VeriGraph_AI/vectorstore/retrieval.py#L115)**: Orchestrates query validation, candidate fetching from a backend, and sequential post-processing.
+
+Example:
+
+```python
+from vectorstore.similarity_search import SimilaritySearch, ChromaSearchBackend
+from vectorstore.retrieval import StandardRetriever
+
+# 1. Initialize backend
+similarity_search = SimilaritySearch(collection_name="verigraph_collection")
+backend = ChromaSearchBackend(similarity_search)
+
+# 2. Instantiate the retriever
+retriever = StandardRetriever(backend=backend)
+
+# 3. Retrieve structured results
+results = retriever.retrieve("What is the password policy?", top_k=3)
+for chunk in results:
+    print(f"[{chunk.score:.4f}] {chunk.text} (Source: {chunk.metadata.get('source')})")
+```
+
 ## End-to-End Pipeline Test
 
-Run the full pipeline with `test_pipeline.py` to validate ingestion, embedding, storage, and retrieval.
+Run the full pipeline with [test_pipeline.py](file:///c:/Users/soura/Documents/Projects/VeriGraph_AI/test_pipeline.py) to validate ingestion, embedding, storage, and retrieval.
 
 ```bash
 python test_pipeline.py --mock-embed

@@ -2,6 +2,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 
 from embeddings.embedding_model import EmbeddingModel
 from vectorstore.chroma_db import ChromaDBManager
+from vectorstore.retrieval import SearchBackend
 
 
 def _default_score_fn(distance: float) -> float:
@@ -119,3 +120,39 @@ class SimilaritySearch:
         score_fn: Optional[Callable[[float], float]] = None,
     ) -> List[Dict[str, Any]]:
         return self.search(query, top_k=top_k, where=where, include=include, score_fn=score_fn)["results"][0]
+
+
+class ChromaSearchBackend(SearchBackend):
+    """
+    ChromaDB implementation of the SearchBackend interface.
+    Adapts the SimilaritySearch class to provide the standard search signature.
+    """
+
+    def __init__(self, similarity_search: SimilaritySearch):
+        """
+        Initialize the backend adapter.
+
+        Args:
+            similarity_search: An instance of SimilaritySearch.
+        """
+        self.similarity_search = similarity_search
+
+    def search(
+        self,
+        query: str,
+        top_k: int = 5,
+        where: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> List[Dict[str, Any]]:
+        """
+        Search ChromaDB for documents matching the query.
+        """
+        include = kwargs.get("include")
+        score_fn = kwargs.get("score_fn")
+        return self.similarity_search.search_one(
+            query=query,
+            top_k=top_k,
+            where=where,
+            include=include,
+            score_fn=score_fn,
+        )

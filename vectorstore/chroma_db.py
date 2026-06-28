@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, cast
 
 import chromadb
-from chromadb.api.models.Collection import Collection
+from chromadb import Collection
 from chromadb.api.types import Metadata
 from chromadb.config import Settings
 
@@ -65,6 +65,7 @@ class ChromaDBManager:
         if not isinstance(metadata, dict):
             raise TypeError("Metadata must be provided as a dictionary.")
 
+        # pyrefly: ignore [unnecessary-type-conversion]
         normalized = {str(k): v for k, v in metadata.items() if k != "embedding"}
         return normalized
 
@@ -87,8 +88,9 @@ class ChromaDBManager:
         elif len(metadatas) != len(ids):
             raise ValueError("Metadata length must match ids.")
 
+        # pyrefly: ignore [unnecessary-type-conversion]
         normalized_ids = [str(item) for item in ids]
-        normalized_metadatas = [self._normalize_metadata(meta) for meta in metadatas]
+        normalized_metadatas = cast(List[Metadata], [self._normalize_metadata(meta) for meta in metadatas])
 
         self.collection.add(
             ids=normalized_ids,
@@ -117,8 +119,9 @@ class ChromaDBManager:
         elif len(metadatas) != len(ids):
             raise ValueError("Metadata length must match ids.")
 
+        # pyrefly: ignore [unnecessary-type-conversion]
         normalized_ids = [str(item) for item in ids]
-        normalized_metadatas = [self._normalize_metadata(meta) for meta in metadatas]
+        normalized_metadatas = cast(List[Metadata], [self._normalize_metadata(meta) for meta in metadatas])
 
         self.collection.upsert(
             ids=normalized_ids,
@@ -203,10 +206,12 @@ class ChromaDBManager:
 
     def get(self, ids: Sequence[str]) -> Dict[str, Any]:
         """Fetch documents by id."""
-        return self.collection.get(ids=[str(item) for item in ids]) # pyright: ignore[reportReturnType]
+        # pyrefly: ignore [unnecessary-type-conversion]
+        return cast(Dict[str, Any], self.collection.get(ids=[str(item) for item in ids]))
 
     def delete(self, ids: Optional[Sequence[str]] = None, where: Optional[Dict[str, Any]] = None) -> None:
         """Delete items from the collection by id or metadata filter."""
+        # pyrefly: ignore [unnecessary-type-conversion]
         self.collection.delete(ids=[str(item) for item in ids] if ids else None, where=where)
 
     def delete_collection(self) -> None:

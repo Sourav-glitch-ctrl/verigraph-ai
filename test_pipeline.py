@@ -1,17 +1,20 @@
 import json
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import argparse
 import platform
 import shutil
+import sys
 import tempfile
 
+from embeddings.embedding_model import EmbeddingModel
 from embeddings.embedding_service import EmbeddingService
 from ingestion.pipeline import IngestionPipeline
 from vectorstore.chroma_db import ChromaDBManager
-from vectorstore.similarity_search import SimilaritySearch
+from vectorstore.similarity_search import SimilaritySearch, ChromaSearchBackend
+from vectorstore.retrieval import StandardRetriever
 
 
 # Set up basic logging so we can see the internal info messages
@@ -80,13 +83,24 @@ def test_pdf_pipeline(mock_embed: bool = False, persist_directory: Optional[str]
     print("\n--- 5. Semantic Search Verification ---")
 
     if mock_embed:
-        class MockEmbeddingModel:
-            def encode(self, text: str):
+        class MockEmbeddingModel(EmbeddingModel):
+            def __init__(self):
+                # Bypass parent class __init__ to avoid loading sentence-transformers model
+                pass
+
+            def encode(self, text: str) -> List[float]:
                 return [float(len(text) % 7 + 1) for _ in range(8)]
+
+            def encode_batch(self, texts: List[str]) -> List[List[float]]:
+                return [self.encode(text) for text in texts]
 
         similarity_search = SimilaritySearch(db=vector_store, embedding_model=MockEmbeddingModel())
     else:
+        assert embedding_service is not None
         similarity_search = SimilaritySearch(db=vector_store, embedding_model=embedding_service.embedding_model)
+
+    backend = ChromaSearchBackend(similarity_search)
+    retriever = StandardRetriever(backend)
 
     test_queries = [
         "How many paid leave days do employees receive?",
@@ -100,19 +114,25 @@ def test_pdf_pipeline(mock_embed: bool = False, persist_directory: Optional[str]
         print("\n" + "=" * 90)
         print(f"Query: {query}")
 
-        results = similarity_search.search(query, top_k=3)
-        hits = results["results"][0]
+        results = retriever.retrieve(query, top_k=3)
 
-        for hit in hits:
-            preview = hit["document"].replace("\n", " ") if isinstance(hit["document"], str) else str(hit["document"])
+        for rank, chunk in enumerate(results, start=1):
+            preview = chunk.text.replace("\n", " ") if isinstance(chunk.text, str) else str(chunk.text)
             preview = preview[:300] + ("..." if len(preview) > 300 else "")
 
-            print(f"\nResult {hit['rank']}")
-            print(f"ID        : {hit['id']}")
-            print(f"Distance  : {hit['distance']:.4f}")
-            print(f"Score     : {hit['score']:.4f}")
-            print(f"Metadata  : {hit['metadata']}")
-            print(f"Document  : {preview}")
+            print(f"\nResult {rank}")
+            print(f"ID        : {chunk.id}")
+            print(f"Score     : {chunk.score:.4f}")
+            
+            # Print metadata and document safely to avoid UnicodeEncodeError on Windows terminal
+            metadata_str = f"Metadata  : {chunk.metadata}"
+            doc_str = f"Document  : {preview}"
+            for line in [metadata_str, doc_str]:
+                try:
+                    print(line)
+                except UnicodeEncodeError:
+                    encoding = sys.stdout.encoding or 'utf-8'
+                    print(line.encode(encoding, errors='replace').decode(encoding))
 
     if cleanup and not persist_directory:
         print(f"\n--- Cleaning up temporary embed directory: {persist_dir}")
@@ -141,5 +161,12 @@ def _parse_args():
 
 
 if __name__ == "__main__":
+    if sys.platform.startswith("win"):
+        try:
+            reconfigure = getattr(sys.stdout, "reconfigure", None)
+            if reconfigure is not None:
+                reconfigure(encoding='utf-8')
+        except Exception:
+            pass
     args = _parse_args()
     test_pdf_pipeline(mock_embed=args.mock_embed, persist_directory=args.persist_dir, cleanup=args.cleanup)
